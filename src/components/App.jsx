@@ -5,6 +5,8 @@ import { Searchbar } from './Searchbar/Searchbar';
 import { ImageGallery } from './ImageGallery/ImageGallery';
 import { Button } from './Button/Button';
 import { Loader } from './Loader/Loader';
+import toast, { Toaster } from 'react-hot-toast';
+import { Notification } from './ErrorMessage/ErrorMessage';
 
 export class App extends Component {
   state = {
@@ -16,20 +18,33 @@ export class App extends Component {
     error: null,
   };
 
-  componentDidUpdate(_, prevState) {
+  async componentDidUpdate(_, prevState) {
     const { query, page } = this.state;
     if (prevState.query !== query || prevState.page !== page) {
-      fetchImages(query, page)
-        .then(resp => {
+      try {
+        const resp = await fetchImages(query, page);
+        if (resp) {
           this.setState(prev => ({
             images:
               page === 1 ? [...resp.hits] : [...prev.images, ...resp.hits],
             totalImages: resp.totalHits,
           }));
-        })
-        .finally(() => {
-          this.setState({ isLoading: false });
-        });
+
+          if (!resp.totalHits) {
+            toast.error(
+              'Sorry, there are no images matching your search query. Please try again!',
+              {
+                duration: 4000,
+              }
+            );
+            return;
+          }
+        }
+      } catch (error) {
+        this.setState({ error });
+      } finally {
+        this.setState({ isLoading: false });
+      }
     }
   }
 
@@ -54,13 +69,16 @@ export class App extends Component {
   };
 
   render() {
+    const { images, error } = this.state;
     return (
       <AppContainer>
         <Searchbar onSubmit={this.handelSubmit} />
+        {error && <Notification />}
 
-        <ImageGallery images={this.state.images} />
+        <ImageGallery images={images} />
 
         {this.renderButtonOrLoader()}
+        <Toaster position="top-center" reverseOrder={true} />
       </AppContainer>
     );
   }
